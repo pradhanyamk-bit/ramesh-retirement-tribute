@@ -1,0 +1,82 @@
+﻿*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+html,body{
+
+    width:100%;
+    height:100%;
+    overflow:hidden;
+
+    background:#000;
+
+}
+
+#globe-container{
+
+    width:100vw;
+    height:100vh;
+
+}
+
+#country-panel{
+    position:fixed;
+    top:0;
+    right:0;
+    width:min(360px, 86vw);
+    height:100vh;
+    padding:72px 34px 34px;
+    color:#f4eee8;
+    background:rgba(5, 5, 5, 0.78);
+    border-left:1px solid rgba(173, 125, 82, 0.42);
+    box-shadow:-18px 0 44px rgba(0, 0, 0, 0.42);
+    transform:translateX(100%);
+    transition:transform 0.35s ease;
+    z-index:10;
+    backdrop-filter:blur(10px);
+}
+
+#country-panel.open{
+    transform:translateX(0);
+}
+
+#country-panel-close{
+    position:absolute;
+    top:22px;
+    right:24px;
+    width:34px;
+    height:34px;
+    border:1px solid rgba(173, 125, 82, 0.55);
+    color:#ad7d52;
+    background:transparent;
+    font-size:28px;
+    line-height:28px;
+    cursor:pointer;
+}
+
+#country-panel-country{
+    margin-bottom:10px;
+    color:#ad7d52;
+    font:600 13px/1.3 Arial, sans-serif;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+}
+
+#country-panel-title{
+    margin-bottom:14px;
+    color:#ffffff;
+    font:400 30px/1.16 Georgia, serif;
+}
+
+#country-panel-years{
+    margin-bottom:24px;
+    color:#d7c6b7;
+    font:500 14px/1.5 Arial, sans-serif;
+}
+
+#country-panel-description{
+    color:#e9ded4;
+    font:400 15px/1.7 Arial, sans-serif;
+}
