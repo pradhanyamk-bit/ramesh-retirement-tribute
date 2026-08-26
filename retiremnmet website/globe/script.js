@@ -202,10 +202,57 @@ const highlightedCountryContent = {
     }
 };
 
+const travelCountryContent = {
+    ARM: "Armenia",
+    AUS: "Australia",
+    AUT: "Austria",
+    BHR: "Bahrain",
+    CAN: "Canada",
+    CHN: "China",
+    CYP: "Cyprus",
+    CZE: "Czech Republic",
+    DNK: "Denmark",
+    EGY: "Egypt",
+    FRA: "France",
+    GEO: "Georgia",
+    DEU: "Germany",
+    GRC: "Greece",
+    IDN: "Indonesia",
+    IRN: "Iran",
+    IRQ: "Iraq",
+    ITA: "Italy",
+    JPN: "Japan",
+    JOR: "Jordan",
+    KEN: "Kenya",
+    KWT: "Kuwait",
+    MNE: "Montenegro",
+    NPL: "Nepal",
+    NLD: "Netherlands",
+    NOR: "Norway",
+    OMN: "Oman",
+    POL: "Poland",
+    QAT: "Qatar",
+    SAU: "Saudi Arabia",
+    SRB: "Serbia",
+    SGP: "Singapore",
+    ZAF: "South Africa",
+    ESP: "Spain",
+    LKA: "Sri Lanka",
+    SWE: "Sweden",
+    CHE: "Switzerland",
+    TZA: "Tanzania",
+    THA: "Thailand",
+    TUR: "Turkey",
+    ARE: "United Arab Emirates",
+    GBR: "United Kingdom",
+    USA: "United States"
+};
+
 const countryGroup = new THREE.Group();
 earth.add(countryGroup);
 
 const countryMeshes = [];
+const travelCountryMeshes = [];
 const countryMaterial = new THREE.MeshBasicMaterial({
     color: 0xb71c1c,
     transparent: true,
@@ -218,6 +265,20 @@ const countryBorderMaterial = new THREE.LineBasicMaterial({
     color: 0xff8a80,
     transparent: true,
     opacity: 0.72
+});
+
+const travelCountryMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffa500,
+    transparent: true,
+    opacity: 0.7,
+    side: THREE.DoubleSide,
+    depthWrite: false
+});
+
+const travelCountryBorderMaterial = new THREE.LineBasicMaterial({
+    color: 0xd6b08c,
+    transparent: true,
+    opacity: 0.58
 });
 
 function ensureCountryPanel() {
@@ -250,6 +311,8 @@ function ensureCountryPanel() {
             #globeViz #country-panel-title{margin-bottom:14px;color:#fff;font:400 30px/1.16 Georgia,serif;}
             #globeViz #country-panel-years{margin-bottom:24px;color:#d7c6b7;font:500 14px/1.5 Arial,sans-serif;}
             #globeViz #country-panel-description{color:#e9ded4;font:400 15px/1.7 Arial,sans-serif;}
+            #globeViz #travel-country-tooltip{position:absolute;left:0;top:0;z-index:5;padding:8px 11px;color:#f4eee8;background:rgba(5,5,5,.78);border:1px solid rgba(173,125,82,.46);box-shadow:0 14px 34px rgba(0,0,0,.34);backdrop-filter:blur(10px);font:500 12px/1.2 Arial,sans-serif;letter-spacing:.04em;text-transform:uppercase;pointer-events:none;opacity:0;transform:translate3d(-999px,-999px,0);transition:opacity .18s ease;}
+            #globeViz #travel-country-tooltip.open{opacity:1;}
         `;
         document.head.appendChild(style);
     }
@@ -258,6 +321,10 @@ function ensureCountryPanel() {
 }
 
 ensureCountryPanel();
+const travelCountryTooltip = document.createElement("div");
+travelCountryTooltip.id = "travel-country-tooltip";
+travelCountryTooltip.setAttribute("role", "status");
+globeContainer.appendChild(travelCountryTooltip);
 const countryPanel = document.getElementById("country-panel");
 const countryPanelCountry = document.getElementById("country-panel-country");
 const countryPanelTitle = document.getElementById("country-panel-title");
@@ -306,68 +373,310 @@ function lonLatToVector3(lon, lat, radius = 1.016) {
     );
 }
 
-function normalizeLongitude(lon, referenceLon) {
-    let normalized = lon;
+function unwrapRing(ring) {
+    if (!ring || ring.length < 4) return [];
 
-    while (normalized - referenceLon > 180) normalized -= 360;
-    while (referenceLon - normalized > 180) normalized += 360;
+    const points = [];
+    let previousLon = ring[0][0];
 
-    return normalized;
-}
+    for (let i = 0; i < ring.length; i++) {
+        let lon = ring[i][0];
+        const lat = ring[i][1];
 
-function buildCountryPolygonMesh(ring, countryData) {
-    if (ring.length < 4) return;
+        while (lon - previousLon > 180) lon -= 360;
+        while (previousLon - lon > 180) lon += 360;
 
-    const referenceLon = ring[0][0];
-    const shapePoints = ring.map(([lon, lat]) => {
-        return new THREE.Vector2(normalizeLongitude(lon, referenceLon), lat);
+        points.push(new THREE.Vector2(lon, lat));
+        previousLon = lon;
+    }
+
+    if (
+        points.length > 1 &&
+        points[0].distanceToSquared(points[points.length - 1]) < 1e-12
+    ) {
+        points.pop();
+    }
+
+    const cleaned = [];
+
+    points.forEach((point) => {
+        if (
+            !cleaned.length ||
+            cleaned[cleaned.length - 1].distanceToSquared(point) > 1e-16
+        ) {
+            cleaned.push(point);
+        }
     });
 
-    const triangles = THREE.ShapeUtils.triangulateShape(shapePoints, []);
+    return cleaned;
+}
+
+function pointInRing(point, ring) {
+    let inside = false;
+
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const xi = ring[i].x;
+        const yi = ring[i].y;
+        const xj = ring[j].x;
+        const yj = ring[j].y;
+        const intersects = ((yi > point.y) !== (yj > point.y)) &&
+            (point.x < ((xj - xi) * (point.y - yi)) / ((yj - yi) || 1e-12) + xi);
+
+        if (intersects) inside = !inside;
+    }
+
+    return inside;
+}
+
+function projectToLocalPlane(points, originLon, originLat, cosLat) {
+    return points.map((point) => new THREE.Vector2(
+        (point.x - originLon) * cosLat,
+        point.y - originLat
+    ));
+}
+
+// Earcut triangles are planar. On a sphere those chords sink into the globe
+// and look like holes. Split long edges on the sphere surface.
+function subdivideSphericalTriangles(lonLatPoints, triangles, radius = 1.016, maxAngleDeg = 2.5) {
+    const maxChordSq = Math.pow(
+        2 * radius * Math.sin(THREE.MathUtils.degToRad(maxAngleDeg) / 2),
+        2
+    );
+    const vertices = lonLatPoints.map((point) => lonLatToVector3(point.x, point.y, radius));
+    let faces = triangles.map((triangle) => triangle.slice());
+    const midpointIndex = new Map();
+
+    const edgeKey = (a, b) => (a < b ? `${a}:${b}` : `${b}:${a}`);
+
+    const getMidpointIndex = (a, b) => {
+        const key = edgeKey(a, b);
+
+        if (midpointIndex.has(key)) return midpointIndex.get(key);
+
+        const mid = vertices[a].clone().add(vertices[b]);
+
+        if (mid.lengthSq() < 1e-16) {
+            mid.copy(vertices[a]);
+        } else {
+            mid.normalize().multiplyScalar(radius);
+        }
+
+        const index = vertices.length;
+
+        vertices.push(mid);
+        midpointIndex.set(key, index);
+
+        return index;
+    };
+
+    for (let pass = 0; pass < 12; pass++) {
+        const nextFaces = [];
+        let splitAny = false;
+
+        for (let i = 0; i < faces.length; i++) {
+            const a = faces[i][0];
+            const b = faces[i][1];
+            const c = faces[i][2];
+            const ab = vertices[a].distanceToSquared(vertices[b]);
+            const bc = vertices[b].distanceToSquared(vertices[c]);
+            const ca = vertices[c].distanceToSquared(vertices[a]);
+            const longest = Math.max(ab, bc, ca);
+
+            if (longest <= maxChordSq) {
+                nextFaces.push(faces[i]);
+                continue;
+            }
+
+            splitAny = true;
+
+            if (longest === ab) {
+                const mid = getMidpointIndex(a, b);
+                nextFaces.push([a, mid, c], [mid, b, c]);
+            } else if (longest === bc) {
+                const mid = getMidpointIndex(b, c);
+                nextFaces.push([a, b, mid], [a, mid, c]);
+            } else {
+                const mid = getMidpointIndex(c, a);
+                nextFaces.push([a, b, mid], [b, c, mid]);
+            }
+        }
+
+        faces = nextFaces;
+
+        if (!splitAny) break;
+    }
+
+    return { vertices, faces };
+}
+
+function getFeatureIsoCode(feature) {
+    const isoCode = feature.properties["ISO3166-1-Alpha-3"];
+
+    if (isoCode && isoCode !== "-99") return isoCode;
+
+    const fallbackIsoByName = {
+        France: "FRA",
+        Norway: "NOR"
+    };
+
+    return fallbackIsoByName[feature.properties.name] || isoCode;
+}
+
+function buildCountryPolygonMesh(
+    rings,
+    countryData,
+    material = countryMaterial,
+    borderMaterial = countryBorderMaterial,
+    meshCollection = countryMeshes
+) {
+    if (!rings || !rings.length) return;
+
+    const outerRing = unwrapRing(rings[0]);
+
+    if (outerRing.length < 3) return;
+
+    const holeRings = [];
+
+    // Extra GeoJSON rings are holes only when they sit inside the outer ring.
+    // Same-file extra land (islands stored as extra rings) is built separately.
+    for (let i = 1; i < rings.length; i++) {
+        const ring = unwrapRing(rings[i]);
+
+        if (ring.length < 3) continue;
+
+        if (pointInRing(ring[0], outerRing)) {
+            holeRings.push(ring);
+        } else {
+            buildCountryPolygonMesh(
+                [rings[i]],
+                countryData,
+                material,
+                borderMaterial,
+                meshCollection
+            );
+        }
+    }
+
+    let originLon = 0;
+    let originLat = 0;
+
+    outerRing.forEach((point) => {
+        originLon += point.x;
+        originLat += point.y;
+    });
+
+    originLon /= outerRing.length;
+    originLat /= outerRing.length;
+
+    const cosLat = Math.max(
+        0.15,
+        Math.abs(Math.cos(THREE.MathUtils.degToRad(originLat)))
+    );
+    const outerXY = projectToLocalPlane(outerRing, originLon, originLat, cosLat);
+    const holeXY = holeRings.map((ring) => (
+        projectToLocalPlane(ring, originLon, originLat, cosLat)
+    ));
+    const triangles = THREE.ShapeUtils.triangulateShape(outerXY, holeXY);
+
+    if (!triangles.length) return;
+
+    const sourcePoints = [...outerRing, ...holeRings.flat()];
+    const subdivided = subdivideSphericalTriangles(sourcePoints, triangles);
     const vertices = [];
 
-    triangles.forEach((triangle) => {
+    subdivided.faces.forEach((triangle) => {
         triangle.forEach((pointIndex) => {
-            const sourcePoint = shapePoints[pointIndex];
-            const vertex = lonLatToVector3(sourcePoint.x, sourcePoint.y);
+            const vertex = subdivided.vertices[pointIndex];
+
             vertices.push(vertex.x, vertex.y, vertex.z);
         });
     });
 
+    if (!vertices.length) return;
+
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+
+    geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(vertices, 3)
+    );
+
     geometry.computeVertexNormals();
 
-    const mesh = new THREE.Mesh(geometry, countryMaterial);
+    const mesh = new THREE.Mesh(geometry, material);
+
     mesh.userData.country = countryData;
+
     countryGroup.add(mesh);
-    countryMeshes.push(mesh);
+    meshCollection.push(mesh);
 
-    const borderVertices = [];
+    const addBorder = (ring) => {
+        if (!ring || ring.length < 2) return;
 
-    shapePoints.forEach((point) => {
-        const vertex = lonLatToVector3(point.x, point.y, 1.018);
-        borderVertices.push(vertex.x, vertex.y, vertex.z);
-    });
+        const borderVertices = [];
 
-    const borderGeometry = new THREE.BufferGeometry();
-    borderGeometry.setAttribute("position", new THREE.Float32BufferAttribute(borderVertices, 3));
+        ring.forEach((point) => {
+            const vertex = lonLatToVector3(
+                point.x,
+                point.y,
+                1.018
+            );
 
-    countryGroup.add(new THREE.LineLoop(borderGeometry, countryBorderMaterial));
+            borderVertices.push(
+                vertex.x,
+                vertex.y,
+                vertex.z
+            );
+        });
+
+        const borderGeometry = new THREE.BufferGeometry();
+
+        borderGeometry.setAttribute(
+            "position",
+            new THREE.Float32BufferAttribute(
+                borderVertices,
+                3
+            )
+        );
+
+        countryGroup.add(
+            new THREE.LineLoop(
+                borderGeometry,
+                borderMaterial
+            )
+        );
+    };
+
+    addBorder(outerRing);
+    holeRings.forEach(addBorder);
 }
 
 function addHighlightedCountry(feature) {
-    const isoCode = feature.properties["ISO3166-1-Alpha-3"];
+    const isoCode = getFeatureIsoCode(feature);
     const countryData = highlightedCountryContent[isoCode];
+    const travelCountryName = travelCountryContent[isoCode];
 
-    if (!countryData) return;
+    if (!countryData && !travelCountryName) return;
 
     const coordinates = feature.geometry.type === "Polygon"
         ? [feature.geometry.coordinates]
         : feature.geometry.coordinates;
 
     coordinates.forEach((polygon) => {
-        buildCountryPolygonMesh(polygon[0], countryData);
+        if (countryData) {
+            buildCountryPolygonMesh(
+                polygon,
+                countryData
+            );
+        } else {
+            buildCountryPolygonMesh(
+                polygon,
+                { country: travelCountryName },
+                travelCountryMaterial,
+                travelCountryBorderMaterial,
+                travelCountryMeshes
+            );
+        }
     });
 }
 
@@ -402,6 +711,42 @@ function openCountryAtPointer(event) {
     }
 }
 
+function positionTravelTooltip(event, countryName) {
+    const containerBounds = globeContainer.getBoundingClientRect();
+    const offset = 14;
+    const tooltipX = event.clientX - containerBounds.left + offset;
+    const tooltipY = event.clientY - containerBounds.top + offset;
+
+    travelCountryTooltip.textContent = countryName;
+    travelCountryTooltip.style.transform = `translate3d(${tooltipX}px, ${tooltipY}px, 0)`;
+    travelCountryTooltip.classList.add("open");
+}
+
+function hideTravelTooltip() {
+    travelCountryTooltip.classList.remove("open");
+}
+
+function updateTravelTooltip(event) {
+    if (event.pointerType !== "mouse" || dragState.active) {
+        hideTravelTooltip();
+        return;
+    }
+
+    const canvasBounds = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((event.clientX - canvasBounds.left) / canvasBounds.width) * 2 - 1;
+    pointer.y = -((event.clientY - canvasBounds.top) / canvasBounds.height) * 2 + 1;
+
+    raycaster.setFromCamera(pointer, camera);
+
+    const hits = raycaster.intersectObjects(travelCountryMeshes, false);
+
+    if (hits.length > 0) {
+        positionTravelTooltip(event, hits[0].object.userData.country.country);
+    } else {
+        hideTravelTooltip();
+    }
+}
+
 renderer.domElement.addEventListener("pointerdown", (event) => {
     dragState.active = true;
     dragState.pointerId = event.pointerId;
@@ -414,6 +759,8 @@ renderer.domElement.addEventListener("pointerdown", (event) => {
 });
 
 renderer.domElement.addEventListener("pointermove", (event) => {
+    updateTravelTooltip(event);
+
     if (!dragState.active || event.pointerId !== dragState.pointerId) return;
 
     const deltaX = event.clientX - dragState.lastX;
@@ -453,6 +800,7 @@ function endDrag(event) {
 
 renderer.domElement.addEventListener("pointerup", endDrag);
 renderer.domElement.addEventListener("pointercancel", endDrag);
+renderer.domElement.addEventListener("pointerleave", hideTravelTooltip);
 
 countryPanelClose.addEventListener("click", () => {
     countryPanel.classList.remove("open");
@@ -538,17 +886,16 @@ dragState.rotationY -= verticalDrag;
 rotateGlobe(horizontalDrag, verticalDrag);
 
 if (!dragState.active && performance.now() >= dragState.resumeAt) {
-    earth.rotation.y += 0.0015;
-    clouds.rotation.y += 0.0018;
-    atmosphere.rotation.y += 0.0015;
+
+    earth.rotation.y += 0.003;
+    clouds.rotation.y += 0.0036;
+    atmosphere.rotation.y += 0.003;
+
 }
 
 renderer.render(
-
-scene,
-
-camera
-
+    scene,
+    camera
 );
 
 }
@@ -579,4 +926,3 @@ globeSize.height
 );
 
 });
-

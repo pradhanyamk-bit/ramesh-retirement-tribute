@@ -235,6 +235,35 @@
     border:1px solid rgba(243,239,230,.1);
 }
 
+.globe-legend{
+    display:flex;
+    justify-content:center;
+    gap:1.4rem;
+    margin-top:1.6rem;
+    flex-wrap:wrap;
+    font-family:var(--mono);
+    font-size:0.68rem;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--grey-dim);
+}
+
+.globe-legend-item{
+    display:inline-flex;
+    align-items:center;
+    gap:.55rem;
+}
+
+.globe-legend-swatch{
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    box-shadow:0 0 14px currentColor;
+}
+
+.globe-legend-swatch.work{color:#b71c1c;background:#b71c1c;}
+.globe-legend-swatch.travel{color:var(--bronze);background:var(--bronze);}
+
   /* ================= SECTION SPACING ================= */
   .section-pad{padding:min(18vh,180px) 0;}
   .section-pad-sm{padding:min(12vh,120px) 0;}
@@ -591,6 +620,51 @@
   .wishes-carousel-button:disabled{cursor:default;opacity:.38;}
   @media (max-width:600px){.wishes-fields{grid-template-columns:1fr;}.wishes-field.message-field{grid-column:auto;}.wishes-guestbook{margin-top:4rem;}.wishes-guestbook-head{align-items:start;flex-direction:column;gap:.6rem;}.wishes-carousel-page{grid-template-columns:1fr;}.wishes-carousel-nav{justify-content:space-between;}.wishes-carousel-button{min-width:calc(50% - .35rem);}}
 
+  /* ================= MOBILE GALLERY LAYOUT ================= */
+@media (max-width: 600px) {
+
+    .gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-auto-rows: 52vw;
+        gap: 1.2vw;
+    }
+
+    /* Picture 1 — full width */
+    .gallery-grid .g1 {
+        grid-column: span 2;
+        grid-row: span 1;
+    }
+
+    /* Pictures 2 + 3 — side by side */
+    .gallery-grid .g-right {
+        grid-column: span 2;
+        grid-row: span 1;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1.2vw;
+    }
+
+    .gallery-grid .g2,
+    .gallery-grid .g3 {
+        grid-column: span 1;
+        grid-row: span 1;
+    }
+
+    /* Picture 4 — full width */
+    .gallery-grid .g4 {
+        grid-column: span 2;
+        grid-row: span 1;
+    }
+
+    /* Pictures 5 + 6 — side by side */
+    .gallery-grid .g5,
+    .gallery-grid .g6 {
+        grid-column: span 1;
+        grid-row: span 1;
+    }
+
+}
   /* ================= SECTION 8 — LEGACY ================= */
   .legacy{
     display:grid;
@@ -848,9 +922,14 @@
 
       <p class="body-text" style="max-width:700px; margin:0 auto; text-align:center;">
         Over three decades at ABB, Ramesh Kumar N worked across multiple countries,
-        contributing to engineering, operations and leadership in different parts of
-        the world. Explore the countries that became milestones in his journey.
+        contributing to engineering, operations and leadership across regions, while
+        his wider journey also carried him through many places around the world.
       </p>
+
+      <div class="globe-legend" aria-label="Globe country legend">
+        <span class="globe-legend-item"><span class="globe-legend-swatch work" aria-hidden="true"></span>Countries where he worked</span>
+        <span class="globe-legend-item"><span class="globe-legend-swatch travel" aria-hidden="true"></span>Countries he travelled to</span>
+      </div>
 
     </div>
 
@@ -881,9 +960,7 @@
      style="width:100%; height:100%; object-fit:cover;">
         <div class="g-caption"></div>
       </div>
-      <div class="g-right">
-
-  <div class="g-right">
+     <div class="g-right">
 
     <div class="g-item g2 reveal reveal-delay-1">
         <img src="images/picture 2.jpeg"
@@ -901,8 +978,7 @@
 
 </div>
 
-</div>
-      <div class="g-item g4 reveal reveal-delay-1">
+<div class="g-item g4 reveal reveal-delay-1">
         <img src="images/picture 4.jpeg"
      alt="Career Moment 4"
      style="width:100%; height:100%; object-fit:cover; object-position:30% center;">
