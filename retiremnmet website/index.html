@@ -643,11 +643,47 @@
   .wishes-carousel-page.is-leaving-right{opacity:0;transform:translateX(7%);}
   .wishes-carousel-page.is-entering-left{opacity:0;transform:translateX(-7%);}
   .wishes-carousel-page.is-entering-right{opacity:0;transform:translateX(7%);}
-  .wish-card{min-height:168px;padding:1.55rem;border:1px solid var(--hair-strong);border-radius:12px;background:rgba(255,255,255,.018);display:flex;flex-direction:column;justify-content:space-between;transition:border-color .35s ease,transform .35s ease,background .35s ease;}
-  .wish-card:hover{border-color:var(--bronze-soft);background:rgba(173,125,82,.045);transform:translateY(-3px);}
-  .wish-message{font:300 1rem/1.72 var(--body);color:var(--beige);}
-  .wish-author{margin-top:1.4rem;font:500 .72rem/1.5 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--warm-white);}
-  .wish-department{margin-top:.25rem;font:400 .65rem/1.5 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--grey-dim);}
+  .wish-card{
+  min-height:168px;
+  padding:1.55rem;
+  border:1px solid var(--hair-strong);
+  border-radius:12px;
+  background:rgba(255,255,255,.018);
+  display:flex;
+  flex-direction:column;
+}
+
+.wish-card:hover{
+  border-color:var(--bronze-soft);
+  background:rgba(173,125,82,.045);
+  transform:translateY(-3px);
+}
+
+.wish-message{
+  margin:0;
+  font:300 1rem/1.72 var(--body);
+  color:var(--beige);
+}
+
+.wish-footer{
+  margin-top:auto;
+}
+
+.wish-author{
+  margin:0;
+  font:500 .72rem/1.5 var(--mono);
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--warm-white);
+}
+
+.wish-department{
+  margin:.25rem 0 0;
+  font:400 .65rem/1.5 var(--mono);
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--grey-dim);
+}
   .wishes-carousel-status{min-height:1.5rem;margin-top:1rem;color:var(--grey-dim);font:400 .7rem/1.5 var(--mono);letter-spacing:.08em;}
   .wishes-carousel-nav{display:flex;justify-content:flex-end;gap:.7rem;margin-top:1.45rem;}
   .wishes-carousel-button{border:1px solid var(--hair-strong);border-radius:999px;background:transparent;color:var(--beige);padding:.7rem 1rem;cursor:pointer;font:500 .66rem var(--mono);letter-spacing:.1em;text-transform:uppercase;transition:border-color .3s ease,color .3s ease,background .3s ease;}
@@ -1575,28 +1611,35 @@
     wishesPrevious.disabled = wishesAreLoading || currentWishesPage === 0;
     wishesNext.disabled = wishesAreLoading || (currentWishesPage + 1) * WISHES_PAGE_SIZE >= totalWishes;
   }
+function createWishCard(wish){ 
+  const card = document.createElement('article'); 
+  const message = document.createElement('p'); 
+  const footer = document.createElement('div'); 
+  const author = document.createElement('p'); 
+  const department = document.createElement('p'); 
+ 
+  card.className = 'wish-card'; 
+  message.className = 'wish-message'; 
+  footer.className = 'wish-footer'; 
+  author.className = 'wish-author'; 
+  department.className = 'wish-department'; 
+ 
+  message.textContent = '“' + wish.message + '”'; 
+  author.textContent = wish.name; 
+ 
+  footer.appendChild(author); 
+ 
+  if(wish.department){ 
+    department.textContent = wish.department; 
+    footer.appendChild(department); 
+  } 
+ 
+  card.append(message, footer); 
+ 
+  return card; 
+}
 
-  function createWishCard(wish){
-    const card = document.createElement('article');
-    const message = document.createElement('p');
-    const author = document.createElement('p');
-    const department = document.createElement('p');
-
-    card.className = 'wish-card';
-    message.className = 'wish-message';
-    author.className = 'wish-author';
-    department.className = 'wish-department';
-    message.textContent = '“' + wish.message + '”';
-    author.textContent = wish.name;
-
-    card.append(message, author);
-    if(wish.department){
-      department.textContent = wish.department;
-      card.append(department);
-    }
-
-    return card;
-  }
+  
 
   function renderWishes(wishes, direction){
     const renderCards = function(){
